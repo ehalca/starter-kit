@@ -1,0 +1,49 @@
+{{#> layout}}
+  <h2
+    style="font-family: 'Roboto Condensed', sans-serif;
+            color: #555b66;
+            margin: 44px 0 16px 0;
+            font-size: 16px;
+            font-weight: bold;
+            font-stretch: condensed;
+            font-style: normal;
+            line-height: 1.34;
+            letter-spacing: normal;
+            text-align: start;"
+  >Dear {{user.firstName}},</h2>
+  <p
+    style="color: #50565f;
+            margin: 0;
+            font-family: 'Source Sans Pro', sans-serif;
+            font-size: 14px;
+            font-weight: normal;
+            font-stretch: normal;
+            font-style: normal;
+            line-height: 1.43;
+            letter-spacing: normal;
+            text-align: left;"
+  >Thank you for your decision to subscribe 
+  </p>
+  <div
+    style='max-width: 373px;
+            height: 69px;
+            padding: 20px 0 0 0;
+            margin: 24px 40px 24px 0;
+            border-radius: 8px;
+            background-color: #f7f8fa;
+            text-align: left;'
+  >
+    <a href="{{verificationLink}}">
+      <h2 style='margin: 0 auto;
+            color: #555b66;
+            width: 156px;
+            font-size: 28px;
+            font-weight: bold;
+            font-stretch: condensed;
+            font-style: normal;
+            line-height: 1.34;
+            letter-spacing: 3px;'>{{verificationCode}}</h2>
+    </a>
+  </div>
+
+{{/layout}}
