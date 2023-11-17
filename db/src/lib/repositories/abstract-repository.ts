@@ -1,15 +1,13 @@
-import {
-    NotFoundException
-} from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 import { Cache } from 'cache-manager';
 import { instanceToPlain, plainToInstance } from 'class-transformer';
 import { kebabCase } from 'lodash';
 import {
-    DeepPartial,
-    Equal,
-    FindOneOptions,
-    Repository,
-    SelectQueryBuilder
+  DeepPartial,
+  Equal,
+  FindOneOptions,
+  Repository,
+  SelectQueryBuilder,
 } from 'typeorm';
 import { Entity } from '../entities/abstract-entity';
 import { AbstractListingOptions } from '../listings/abstract.listing-options';
@@ -53,23 +51,23 @@ export abstract class AbstractRepository<E extends Entity> {
     id: string | null = null,
     customFetch: ((...any: any[]) => Promise<E | null>) | null = null
   ): Promise<E | null> {
-    if (!id) {
+    if (!id && !customFetch) {
       throw new Error('Invalid arguments!');
     }
-
-    const cacheKey = this.getEntityCacheKey(id);
-    const cachedValue = id ? await this.cacheManager.get(cacheKey) : null;
-    const fallback = customFetch || ((id) => this.getModelFromDB(id));
-    if (!cachedValue) {
-      const entity = await fallback(id);
-      if (entity) {
-        await this.addEntityToCache(entity);
+    if (id) {
+      const cacheKey = this.getEntityCacheKey(id);
+      const cachedValue = await this.cacheManager.get(cacheKey);
+      if (cachedValue) {
+        return plainToInstance(this.entity, cachedValue);
       }
-
-      return entity;
+    }
+    const fallback = customFetch || ((id) => this.getModelFromDB(id));
+    const entity = await fallback(id);
+    if (entity) {
+      await this.addEntityToCache(entity);
     }
 
-    return plainToInstance(this.entity, cachedValue);
+    return entity;
   }
 
   public getEntities(ids: string[]): Promise<E[]> {

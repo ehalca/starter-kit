@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../propri"
+		}
+	],
+	"settings": {
+		"nuxt.isNuxtApp": false
+	}
+}

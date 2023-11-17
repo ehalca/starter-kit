@@ -9,7 +9,6 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService, JwtSignOptions } from '@nestjs/jwt';
-import moment from 'moment';
 import { ConfigService } from '@nestjs/config';
 import {
   RegisterRequest,
@@ -32,6 +31,7 @@ import { User } from '../entities/user.entity';
 import { UsersService } from './users.service';
 import { generate } from 'randomstring';
 import { TwoFactorAuthService } from './two-factor-auth.service';
+import { add, addMilliseconds } from 'date-fns';
 
 @Injectable()
 export class AuthService {
@@ -55,17 +55,17 @@ export class AuthService {
       email: registrationDto.email,
     });
     if (!registerRequest) {
-      const expiresAt = moment()
-        .add(
-          this.configService.get('auth.registrationExpirationTime', {infer: true}),
-          'hour'
-        )
-        .toDate();
+      const expiresAt = addMilliseconds(
+        new Date(),
+        this.configService.get<number>('auth.registrationExpirationTime', {
+          infer: true,
+        })
+      );
 
       if (registrationDto.password) {
         registrationDto.password = await hash(
           registrationDto.password,
-          this.configService.get('auth.passwordSalt', {infer: true})!
+          this.configService.get('auth.passwordSalt', { infer: true })!
         );
       }
 
@@ -106,7 +106,9 @@ export class AuthService {
     }
 
     try {
-      const adminRole = await this.rolesRepo.findEntity({ where: { name: 'admin' } });
+      const adminRole = await this.rolesRepo.findEntity({
+        where: { name: 'admin' },
+      });
       const user = await this.usersService.create({
         ...registerRequest.registerObject,
         roles: [adminRole],
@@ -125,9 +127,7 @@ export class AuthService {
     }
   }
 
-  public async getUserAuthenticationMode(
-    user: User
-  ) {
+  public async getUserAuthenticationMode(user: User) {
     return {
       password: !!user.password,
       tfa: await this.twoFactorAuthService.isUserTwoFactorAuthEnabled(user.id),
@@ -144,14 +144,12 @@ export class AuthService {
       await this.authRepository.createEmailAuthenticationRequest({
         userId: user.id,
         code: generate(6).toUpperCase(),
-        expiresAt: moment()
-          .add(
-            this.configService.get(
-              'auth.emailAuthCodeExpirationTime', {infer: true}
-            ),
-            'minutes'
-          )
-          .toISOString(),
+        expiresAt: addMilliseconds(
+          new Date(),
+          this.configService.get<number>('auth.emailAuthCodeExpirationTime', {
+            infer: true,
+          })
+        ).toISOString(),
       });
 
     await this.notificationsService.loginAuthentication(
@@ -166,7 +164,7 @@ export class AuthService {
     email: string,
     secret: string,
     loginAttempt: LoginAttempt
-  ): Promise<{ user: User; authMode: {password: boolean, tfa: boolean} }> {
+  ): Promise<{ user: User; authMode: { password: boolean; tfa: boolean } }> {
     const user = await this.usersService.getByEmail(email);
     if (user) {
       loginAttempt.userId = user.id;
@@ -228,12 +226,12 @@ export class AuthService {
   ): Promise<boolean> {
     const user = await this.usersService.getByEmail(forgotPasswordDto.email);
     if (user) {
-      const expiresAt = moment()
-        .add(
-          this.configService.get('auth.forgotPasswordExpirationTime', {infer: true}),
-          'hour'
-        )
-        .toISOString();
+      const expiresAt = addMilliseconds(
+        new Date(),
+        this.configService.get<number>('auth.forgotPasswordExpirationTime', {
+          infer: true,
+        })
+      ).toISOString();
 
       const passwordRequest =
         await this.authRepository.createForgotPasswordRequest({
@@ -286,10 +284,7 @@ export class AuthService {
     }
 
     if (user.password) {
-      const checkPass = await compare(
-        resetPasswordDto.password,
-        user.password
-      );
+      const checkPass = await compare(resetPasswordDto.password, user.password);
       if (checkPass) {
         throw new BadRequestException(
           'Password should not match current password!'
@@ -354,22 +349,21 @@ export class AuthService {
   }
 
   public generateAccessToken(user: LoggedUser) {
-    return this.generateJWT(
-      user,
-      {
-        secret: this.configService.get('auth.secret', {infer:true})
-      }
-    );
+    return this.generateJWT(user, {
+      secret: this.configService.get('auth.secret', { infer: true }),
+      expiresIn: this.configService.get('auth.expiresIn', { infer: true }),
+    });
   }
 
   public async generateRefreshToken(user: LoggedUser) {
-    const refreshToken = this.generateJWT(
-      user,
-      {
-        secret: this.configService.get('auth.secret', {infer:true})
-      }
+    const refreshToken = this.generateJWT(user, {
+      secret: this.configService.get('auth.secret', { infer: true }),
+    });
+    const hashedToken = await hash(
+      refreshToken.token,
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      this.configService.get('auth.refreshTokenSalt', { infer: true })!
     );
-    const hashedToken = await hash(refreshToken.token, this.configService.get('auth.refreshTokenSalt', {infer:true})!);
     await this.usersService.update(user.id, { refreshToken: hashedToken });
     return refreshToken;
   }
@@ -414,7 +408,10 @@ export class AuthService {
 
     return {
       token: this.jwtService.sign(payload, tokenData),
-      expiresAt: moment().add(tokenData.expiresIn, 'second').unix(),
+      expiresAt: addMilliseconds(
+        new Date(),
+        tokenData.expiresIn as number
+      ).getTime(),
     };
   }
 
